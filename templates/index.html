@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Push Notification & Chat Control Center</title>
+    <!-- Modern Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Styled Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="stars"></div>
+    <div class="glow-container">
+        <div class="glow-spot glow-1"></div>
+        <div class="glow-spot glow-2"></div>
+    </div>
+    
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <span class="icon">⚡</span>
+                <h1>Push-Chat</h1>
+                <span class="badge">API Controller</span>
+            </div>
+            <div id="config-status-badge" class="status-badge loading">
+                <span class="dot"></span> Checking Configuration...
+            </div>
+        </header>
+
+        <!-- Main Dashboard Layout -->
+        <main class="dashboard-grid">
+            
+            <!-- Left Panel: Composer -->
+            <section class="panel glass">
+                <div class="panel-header">
+                    <h2>Send Private Notification</h2>
+                    <p>Deliver messages directly to individual user accounts.</p>
+                </div>
+                
+                <form id="notification-form" class="form-group" onsubmit="handleFormSubmit(event)">
+                    <!-- Step 1: Recipient Search -->
+                    <div class="input-wrapper">
+                        <label for="username-input">Recipient Username</label>
+                        <div class="search-bar">
+                            <input type="text" id="username-input" placeholder="e.g., truongtd3" required autocomplete="off">
+                            <button type="button" id="lookup-btn" onclick="lookupUser()">Verify</button>
+                        </div>
+                        <p class="input-hint">Search by email, UPN, or nickname alias.</p>
+                    </div>
+
+                    <!-- User Resolution Result Card -->
+                    <div id="resolved-user-card" class="user-card hidden">
+                        <div class="avatar" id="user-avatar-initials">?</div>
+                        <div class="user-info">
+                            <h4 id="user-display-name">Searching...</h4>
+                            <p id="user-upn-text"></p>
+                            <span class="user-id-tag" id="user-id-text"></span>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Select Channel -->
+                    <div class="input-wrapper">
+                        <label>Delivery Channel</label>
+                        <div class="channel-selector">
+                            <label class="channel-option selected" id="opt-teams-bot">
+                                <input type="radio" name="channel" value="teams_bot" checked onchange="toggleChannelFields()">
+                                <div class="option-content">
+                                    <span class="icon">💬</span>
+                                    <div class="option-text">
+                                        <strong>Teams Bot</strong>
+                                        <span>Proactive 1:1 message</span>
+                                    </div>
+                                </div>
+                            </label>
+                            
+                            <label class="channel-option" id="opt-teams-activity">
+                                <input type="radio" name="channel" value="teams_activity" onchange="toggleChannelFields()">
+                                <div class="option-content">
+                                    <span class="icon">🔔</span>
+                                    <div class="option-text">
+                                        <strong>Teams Feed</strong>
+                                        <span>Activity Feed Alert</span>
+                                    </div>
+                                </div>
+                            </label>
+
+                            <label class="channel-option" id="opt-email">
+                                <input type="radio" name="channel" value="email" onchange="toggleChannelFields()">
+                                <div class="option-content">
+                                    <span class="icon">✉️</span>
+                                    <div class="option-text">
+                                        <strong>Email</strong>
+                                        <span>Outlook SendMail</span>
+                                    </div>
+                                </div>
+                            </label>
+
+                            <label class="channel-option" id="opt-webhook">
+                                <input type="radio" name="channel" value="webhook" onchange="toggleChannelFields()">
+                                <div class="option-content">
+                                    <span class="icon">🔗</span>
+                                    <div class="option-text">
+                                        <strong>Teams Webhook</strong>
+                                        <span>Post to channel webhook</span>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Dynamic Channel-Specific Fields -->
+                    <div id="email-fields" class="dynamic-fields hidden">
+                        <div class="input-wrapper">
+                            <label for="email-subject">Email Subject</label>
+                            <input type="text" id="email-subject" value="System Notification" placeholder="Enter email subject">
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="sender-email">Sender Override (Optional)</label>
+                            <input type="email" id="sender-email" placeholder="e.g. system-notify@yourdomain.com">
+                            <p class="input-hint">Requires authorized Mail.Send permission for this sender.</p>
+                        </div>
+                    </div>
+
+                    <div id="webhook-fields" class="dynamic-fields hidden">
+                        <div class="input-wrapper">
+                            <label for="webhook-url">Incoming Webhook URL</label>
+                            <input type="text" id="webhook-url" placeholder="https://yourtenant.webhook.office.com/...">
+                            <p class="input-hint">Create a webhook connector on your Teams channel to obtain this URL.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Message Content -->
+                    <div class="input-wrapper">
+                        <label for="message-input">Message Content</label>
+                        <textarea id="message-input" rows="4" placeholder="Type your notification message here..." required></textarea>
+                    </div>
+
+                    <button type="submit" id="submit-btn" class="btn-primary">
+                        <span>Send Notification</span>
+                        <div class="spinner hidden" id="submit-spinner"></div>
+                    </button>
+                </form>
+            </section>
+
+            <!-- Right Panel: Live Logs -->
+            <section class="panel glass console-panel">
+                <div class="panel-header">
+                    <div class="flex-between">
+                        <h2>API Response & Delivery Log</h2>
+                        <button id="clear-logs-btn" class="btn-text" onclick="clearLogs()">Clear Logs</button>
+                    </div>
+                    <p>Live execution logs and response bodies returned by Microsoft Graph.</p>
+                </div>
+                
+                <div class="console-body">
+                    <div id="console-output" class="console-logs">
+                        <div class="log-line system">Console Initialized. System ready.</div>
+                    </div>
+                </div>
+
+                <div class="troubleshoot-guide">
+                    <h3>💡 Troubleshooting Tips</h3>
+                    <ul>
+                        <li>Make sure the user <strong>truongtd3</strong> exists in your tenant directory.</li>
+                        <li><strong>Teams Bot</strong> requires the bot app to be installed by the user in Teams first.</li>
+                        <li><strong>App Manifest:</strong> Download the preconfigured <a href="/api/manifest/download" target="_blank" style="color: #6366f1; text-decoration: underline; font-weight: 500;">teams_manifest.zip</a> to install the bot in Microsoft Teams.</li>
+                        <li><strong>Activity Feed</strong> requires <code>TeamsActivity.Send</code> application permission.</li>
+                        <li><strong>Email</strong> requires <code>Mail.Send</code> application permission.</li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Frontend Script Logic -->
+    <script>
+        // Fetch and show Azure Configuration Status on load
+        async function fetchConfigStatus() {
+            const badge = document.getElementById("config-status-badge");
+            try {
+                const res = await fetch("/api/config");
+                const data = await res.json();
+                
+                if (data.status === "Configured") {
+                    badge.className = "status-badge active";
+                    badge.innerHTML = `<span class="dot"></span> Connected: ${data.client_id.substring(0, 8)}...`;
+                    addLog("Azure configuration loaded. Client ID connected.", "info");
+                } else {
+                    badge.className = "status-badge inactive";
+                    badge.innerHTML = `<span class="dot"></span> Config Error`;
+                    addLog(`Config Error: ${data.status}`, "error");
+                }
+            } catch (err) {
+                badge.className = "status-badge inactive";
+                badge.innerHTML = `<span class="dot"></span> Connection Failed`;
+                addLog(`Failed to communicate with Flask backend: ${err.message}`, "error");
+            }
+        }
+
+        // Add formatted lines to the scrolling console log
+        function addLog(message, type = "info") {
+            const consoleBox = document.getElementById("console-output");
+            const time = new Date().toLocaleTimeString();
+            
+            const line = document.createElement("div");
+            line.className = `log-line ${type}`;
+            
+            let displayMsg = message;
+            if (typeof message === "object") {
+                displayMsg = `<pre>${JSON.stringify(message, null, 2)}</pre>`;
+            }
+            
+            line.innerHTML = `<span class="timestamp">[${time}]</span> ${displayMsg}`;
+            consoleBox.appendChild(line);
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+        }
+
+        function clearLogs() {
+            const consoleBox = document.getElementById("console-output");
+            consoleBox.innerHTML = '<div class="log-line system">Console cleared. System ready.</div>';
+        }
+
+        // Look up user details in Azure AD using the lookup endpoint
+        async function lookupUser() {
+            const username = document.getElementById("username-input").value.strip || document.getElementById("username-input").value.trim();
+            if (!username) {
+                alert("Please enter a username first.");
+                return;
+            }
+            
+            const card = document.getElementById("resolved-user-card");
+            const nameEl = document.getElementById("user-display-name");
+            const upnEl = document.getElementById("user-upn-text");
+            const idEl = document.getElementById("user-id-text");
+            const avatarEl = document.getElementById("user-avatar-initials");
+            
+            card.className = "user-card loading-card";
+            card.classList.remove("hidden");
+            nameEl.textContent = "Searching Microsoft Directory...";
+            upnEl.textContent = "";
+            idEl.textContent = "";
+            avatarEl.textContent = "⏳";
+            
+            try {
+                addLog(`Searching directory for user: ${username}...`, "info");
+                const res = await fetch(`/api/user/${encodeURIComponent(username)}`);
+                const user = await res.json();
+                
+                if (res.status !== 200) {
+                    card.className = "user-card error-card";
+                    nameEl.textContent = "User Not Found";
+                    upnEl.textContent = user.error || "Details unavailable.";
+                    avatarEl.textContent = "❌";
+                    addLog(`User look up failed: ${user.error || res.statusText}`, "error");
+                    return;
+                }
+                
+                card.className = "user-card success-card";
+                nameEl.textContent = user.displayName || "Unknown User";
+                upnEl.textContent = user.mail || user.userPrincipalName;
+                idEl.textContent = `Obj ID: ${user.id}`;
+                
+                // Set avatar initials
+                const initials = (user.displayName || "U")
+                    .split(" ")
+                    .map(n => n[0])
+                    .join("")
+                    .substring(0, 2)
+                    .toUpperCase();
+                avatarEl.textContent = initials;
+                
+                addLog(`User resolved: ${user.displayName} (ID: ${user.id})`, "success");
+            } catch (err) {
+                card.className = "user-card error-card";
+                nameEl.textContent = "Lookup Error";
+                upnEl.textContent = err.message;
+                avatarEl.textContent = "⚠️";
+                addLog(`Error querying directory: ${err.message}`, "error");
+            }
+        }
+
+        // Toggle form fields based on selected delivery channel
+        function toggleChannelFields() {
+            const channel = document.querySelector('input[name="channel"]:checked').value;
+            const emailFields = document.getElementById("email-fields");
+            const webhookFields = document.getElementById("webhook-fields");
+            const usernameInput = document.getElementById("username-input");
+            const lookupBtn = document.getElementById("lookup-btn");
+            
+            // Toggle highlight classes on options
+            document.querySelectorAll(".channel-option").forEach(opt => opt.classList.remove("selected"));
+            if (channel === "teams_bot") document.getElementById("opt-teams-bot").classList.add("selected");
+            if (channel === "teams_activity") document.getElementById("opt-teams-activity").classList.add("selected");
+            if (channel === "email") document.getElementById("opt-email").classList.add("selected");
+            if (channel === "webhook") document.getElementById("opt-webhook").classList.add("selected");
+
+            // Toggle Email fields
+            if (channel === "email") {
+                emailFields.classList.remove("hidden");
+            } else {
+                emailFields.classList.add("hidden");
+            }
+
+            // Toggle Webhook fields
+            if (channel === "webhook") {
+                webhookFields.classList.remove("hidden");
+                usernameInput.required = false;
+                usernameInput.placeholder = "Not required for webhooks";
+                lookupBtn.disabled = true;
+            } else {
+                webhookFields.classList.add("hidden");
+                usernameInput.required = true;
+                usernameInput.placeholder = "e.g., truongtd3";
+                lookupBtn.disabled = false;
+            }
+        }
+
+        // Submit form parameters to Flask API to trigger the push notification
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            const submitBtn = document.getElementById("submit-btn");
+            const spinner = document.getElementById("submit-spinner");
+            
+            const username = document.getElementById("username-input").value.trim();
+            const message = document.getElementById("message-input").value.trim();
+            const channel = document.querySelector('input[name="channel"]:checked').value;
+            
+            const payload = { username, message, channel };
+            
+            if (channel === "email") {
+                payload.subject = document.getElementById("email-subject").value.trim();
+                const sender = document.getElementById("sender-email").value.trim();
+                if (sender) payload.sender_email = sender;
+            } else if (channel === "webhook") {
+                payload.webhook_url = document.getElementById("webhook-url").value.trim();
+            }
+            
+            // Set sending UI state
+            submitBtn.disabled = true;
+            spinner.classList.remove("hidden");
+            
+            addLog(`Triggering API POST /api/send (${channel})...`, "info");
+            
+            try {
+                const res = await fetch("/api/send", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+                
+                if (res.status === 200 && data.success) {
+                    addLog(`API Response: Delivery Successful!`, "success");
+                    addLog(data, "success");
+                } else {
+                    addLog(`API Response: Delivery Failed (Status ${res.status})`, "error");
+                    addLog(data, "error");
+                }
+            } catch (err) {
+                addLog(`Network/Server Error: ${err.message}`, "error");
+            } finally {
+                submitBtn.disabled = false;
+                spinner.classList.add("hidden");
+            }
+        }
+
+        // Initial setup
+        window.addEventListener("DOMContentLoaded", () => {
+            fetchConfigStatus();
+        });
+    </script>
+</body>
+</html>
