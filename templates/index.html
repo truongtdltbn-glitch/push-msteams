@@ -62,78 +62,7 @@
                         </div>
                     </div>
 
-                    <!-- Step 2: Select Channel -->
-                    <div class="input-wrapper">
-                        <label>Delivery Channel</label>
-                        <div class="channel-selector">
-                            <label class="channel-option selected" id="opt-teams-bot">
-                                <input type="radio" name="channel" value="teams_bot" checked onchange="toggleChannelFields()">
-                                <div class="option-content">
-                                    <span class="icon">💬</span>
-                                    <div class="option-text">
-                                        <strong>Teams Bot</strong>
-                                        <span>Proactive 1:1 message</span>
-                                    </div>
-                                </div>
-                            </label>
-                            
-                            <label class="channel-option" id="opt-teams-activity">
-                                <input type="radio" name="channel" value="teams_activity" onchange="toggleChannelFields()">
-                                <div class="option-content">
-                                    <span class="icon">🔔</span>
-                                    <div class="option-text">
-                                        <strong>Teams Feed</strong>
-                                        <span>Activity Feed Alert</span>
-                                    </div>
-                                </div>
-                            </label>
-
-                            <label class="channel-option" id="opt-email">
-                                <input type="radio" name="channel" value="email" onchange="toggleChannelFields()">
-                                <div class="option-content">
-                                    <span class="icon">✉️</span>
-                                    <div class="option-text">
-                                        <strong>Email</strong>
-                                        <span>Outlook SendMail</span>
-                                    </div>
-                                </div>
-                            </label>
-
-                            <label class="channel-option" id="opt-webhook">
-                                <input type="radio" name="channel" value="webhook" onchange="toggleChannelFields()">
-                                <div class="option-content">
-                                    <span class="icon">🔗</span>
-                                    <div class="option-text">
-                                        <strong>Teams Webhook</strong>
-                                        <span>Post to channel webhook</span>
-                                    </div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Step 3: Dynamic Channel-Specific Fields -->
-                    <div id="email-fields" class="dynamic-fields hidden">
-                        <div class="input-wrapper">
-                            <label for="email-subject">Email Subject</label>
-                            <input type="text" id="email-subject" value="System Notification" placeholder="Enter email subject">
-                        </div>
-                        <div class="input-wrapper">
-                            <label for="sender-email">Sender Override (Optional)</label>
-                            <input type="email" id="sender-email" placeholder="e.g. system-notify@yourdomain.com">
-                            <p class="input-hint">Requires authorized Mail.Send permission for this sender.</p>
-                        </div>
-                    </div>
-
-                    <div id="webhook-fields" class="dynamic-fields hidden">
-                        <div class="input-wrapper">
-                            <label for="webhook-url">Incoming Webhook URL</label>
-                            <input type="text" id="webhook-url" placeholder="https://yourtenant.webhook.office.com/...">
-                            <p class="input-hint">Create a webhook connector on your Teams channel to obtain this URL.</p>
-                        </div>
-                    </div>
-
-                    <!-- Step 4: Message Content -->
+                    <!-- Message Content -->
                     <div class="input-wrapper">
                         <label for="message-input">Message Content</label>
                         <textarea id="message-input" rows="4" placeholder="Type your notification message here..." required></textarea>
@@ -165,11 +94,10 @@
                 <div class="troubleshoot-guide">
                     <h3>💡 Troubleshooting Tips</h3>
                     <ul>
-                        <li>Make sure the user <strong>truongtd3</strong> exists in your tenant directory.</li>
-                        <li><strong>Teams Bot</strong> requires the bot app to be installed by the user in Teams first.</li>
-                        <li><strong>App Manifest:</strong> Download the preconfigured <a href="/api/manifest/download" target="_blank" style="color: #6366f1; text-decoration: underline; font-weight: 500;">teams_manifest.zip</a> to install the bot in Microsoft Teams.</li>
-                        <li><strong>Activity Feed</strong> requires <code>TeamsActivity.Send</code> application permission.</li>
-                        <li><strong>Email</strong> requires <code>Mail.Send</code> application permission.</li>
+                        <li>Make sure the user exists in your tenant directory.</li>
+                        <li><strong>Bot Installation:</strong> The recipient must have installed this bot in their personal Teams first.</li>
+                        <li><strong>App Manifest:</strong> Download <a href="/api/manifest/download" target="_blank" style="color: #6366f1; text-decoration: underline; font-weight: 500;">teams_manifest.zip</a> to install the bot in Microsoft Teams.</li>
+                        <li>Verify <code>User.Read.All</code> permission is granted in Azure App Registration.</li>
                     </ul>
                 </div>
             </section>
@@ -283,41 +211,7 @@
             }
         }
 
-        // Toggle form fields based on selected delivery channel
-        function toggleChannelFields() {
-            const channel = document.querySelector('input[name="channel"]:checked').value;
-            const emailFields = document.getElementById("email-fields");
-            const webhookFields = document.getElementById("webhook-fields");
-            const usernameInput = document.getElementById("username-input");
-            const lookupBtn = document.getElementById("lookup-btn");
-            
-            // Toggle highlight classes on options
-            document.querySelectorAll(".channel-option").forEach(opt => opt.classList.remove("selected"));
-            if (channel === "teams_bot") document.getElementById("opt-teams-bot").classList.add("selected");
-            if (channel === "teams_activity") document.getElementById("opt-teams-activity").classList.add("selected");
-            if (channel === "email") document.getElementById("opt-email").classList.add("selected");
-            if (channel === "webhook") document.getElementById("opt-webhook").classList.add("selected");
-
-            // Toggle Email fields
-            if (channel === "email") {
-                emailFields.classList.remove("hidden");
-            } else {
-                emailFields.classList.add("hidden");
-            }
-
-            // Toggle Webhook fields
-            if (channel === "webhook") {
-                webhookFields.classList.remove("hidden");
-                usernameInput.required = false;
-                usernameInput.placeholder = "Not required for webhooks";
-                lookupBtn.disabled = true;
-            } else {
-                webhookFields.classList.add("hidden");
-                usernameInput.required = true;
-                usernameInput.placeholder = "e.g., truongtd3";
-                lookupBtn.disabled = false;
-            }
-        }
+// No channel selection needed - always use teams_bot
 
         // Submit form parameters to Flask API to trigger the push notification
         async function handleFormSubmit(event) {
@@ -328,23 +222,14 @@
             
             const username = document.getElementById("username-input").value.trim();
             const message = document.getElementById("message-input").value.trim();
-            const channel = document.querySelector('input[name="channel"]:checked').value;
             
-            const payload = { username, message, channel };
-            
-            if (channel === "email") {
-                payload.subject = document.getElementById("email-subject").value.trim();
-                const sender = document.getElementById("sender-email").value.trim();
-                if (sender) payload.sender_email = sender;
-            } else if (channel === "webhook") {
-                payload.webhook_url = document.getElementById("webhook-url").value.trim();
-            }
+            const payload = { username, message };
             
             // Set sending UI state
             submitBtn.disabled = true;
             spinner.classList.remove("hidden");
             
-            addLog(`Triggering API POST /api/send (${channel})...`, "info");
+            addLog(`Triggering API POST /api/send (teams_bot)...`, "info");
             
             try {
                 const res = await fetch("/api/send", {

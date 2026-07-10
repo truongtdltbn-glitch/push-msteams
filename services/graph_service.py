@@ -24,16 +24,44 @@ class GraphService:
             scopes = ["https://graph.microsoft.com/.default"]
         
         app = cls._get_msal_app()
-        # Acquire token from cache if valid, otherwise request new one
-        result = app.acquire_token_silent(scopes=scopes, account=None)
-        if not result:
-            result = app.acquire_token_for_client(scopes=scopes)
+        # Always acquire fresh token (don't use cache)
+        result = app.acquire_token_for_client(scopes=scopes)
         
         if "access_token" in result:
             return result["access_token"]
         else:
             error_desc = result.get("error_description", "Unknown error")
             raise Exception(f"Failed to acquire Microsoft Graph token: {error_desc}")
+
+    @classmethod
+    def get_access_token_with_credentials(cls, username, password, scopes=None):
+        """
+        Retrieve access token using Resource Owner Password Credentials flow.
+        Used for service account (bot) authentication.
+        NOTE: Requires MFA to be disabled for the user account.
+        """
+        if scopes is None:
+            scopes = ["https://graph.microsoft.com/.default"]
+        
+        token_url = f"https://login.microsoftonline.com/{Config.AZURE_TENANT_ID}/oauth2/v2.0/token"
+        
+        payload = {
+            'client_id': Config.AZURE_CLIENT_ID,
+            'client_secret': Config.AZURE_CLIENT_SECRET,
+            'grant_type': 'password',
+            'scope': ' '.join(scopes),
+            'username': username,
+            'password': password,
+        }
+        
+        response = requests.post(token_url, data=payload)
+        response_json = response.json()
+        
+        if 'access_token' in response_json:
+            return response_json['access_token']
+        else:
+            error_desc = response_json.get('error_description', 'Unknown error')
+            raise Exception(f"Failed to acquire token with credentials: {error_desc}")
 
     @classmethod
     def get_headers(cls):

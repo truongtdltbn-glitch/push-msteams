@@ -1,6 +1,0 @@
-curl -X POST "https://login.microsoftonline.com/c756d8b9-34af-408b-b1e4-9f084cbcc023/oauth2/v2.0/token" \
--H "Content-Type: application/x-www-form-urlencoded" \
--d "client_id=b155469d-49d3-47be-aefd-4da3c3765a72" \
--d "client_secret=Qt38Q~fjfx6ALVoVWhYFX1a27GboBMm6zTUnJaj6" \
--d "scope=https://graph.microsoft.com/.default" \
--d "grant_type=client_credentials"

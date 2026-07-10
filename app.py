@@ -2,10 +2,7 @@ import logging
 from flask import Flask, request, jsonify, render_template
 from config import Config
 from services.graph_service import GraphService
-from services.teams_bot_service import TeamsBotService
 from services.teams_activity_service import TeamsActivityService
-from services.email_service import EmailService
-from services.webhook_service import WebhookService
 
 
 # Configure Logging
@@ -53,134 +50,59 @@ def find_user(username):
 
 @app.route("/api/send", methods=["POST"])
 def send_notification():
-    """API endpoint to send a notification to a specific user."""
+    """API endpoint to send a private Teams message to a specific user."""
     data = request.get_json() or {}
     
     username = data.get("username")
     message = data.get("message")
-    channel = data.get("channel", "teams_bot") # teams_bot, email, teams_activity, webhook
     
+    if not username:
+        return jsonify({"error": "Missing required field: 'username'"}), 400
     if not message:
         return jsonify({"error": "Missing required field: 'message'"}), 400
-    if channel != "webhook" and not username:
-        return jsonify({"error": "Missing required field: 'username' for this channel."}), 400
         
     try:
-        result = {}
-        recipient_info = None
-
-        # 1. If not a generic webhook, look up the user
-        if channel != "webhook":
-            logger.info(f"Looking up user: {username}")
-            user = GraphService.find_user(username)
-            if not user:
-                return jsonify({
-                    "success": False,
-                    "error": f"User '{username}' was not found in Microsoft Entra ID. Please ensure the user exists."
-                }), 404
-                
-            user_id = user.get("id")
-            user_upn = user.get("userPrincipalName")
-            user_email = user.get("mail") or user_upn
-            display_name = user.get("displayName", username)
+        # 1. Look up the user in Azure AD
+        logger.info(f"Looking up user: {username}")
+        user = GraphService.find_user(username)
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": f"User '{username}' was not found in Microsoft Entra ID."
+            }), 404
             
-            recipient_info = {
-                "username": username,
-                "displayName": display_name,
-                "userPrincipalName": user_upn,
-                "email": user_email,
-                "id": user_id
-            }
-            logger.info(f"Found user: {display_name} (UPN: {user_upn}, ID: {user_id})")
+        user_id = user.get("id")
+        user_upn = user.get("userPrincipalName")
+        display_name = user.get("displayName", username)
         
-        # 2. Route message to selected channel
-        if channel == "teams_bot":
-            logger.info(f"Sending Teams Bot message to: {user_upn}")
-            bot_result = TeamsBotService.send_proactive_message(
-                tenant_id=Config.AZURE_TENANT_ID,
-                user_aad_id=user_id,
-                message_text=message
-            )
-            result = {
-                "channel": "teams_bot",
-                "details": bot_result,
-                "status": "Message sent successfully"
-            }
-            
-        elif channel == "teams_activity":
-            logger.info(f"Sending Teams Activity Feed notification to: {user_upn}")
-            activity_result = TeamsActivityService.send_activity_notification(
-                user_id=user_id,
-                message_text=message
-            )
-            result = {
-                "channel": "teams_activity",
-                "details": activity_result,
-                "status": "Activity Feed notification sent successfully"
-            }
-            
-        elif channel == "email":
-            logger.info(f"Sending email notification to: {user_email}")
-            subject = data.get("subject", "New Notification from System")
-            sender = data.get("sender_email") # Optional custom sender override
-            email_result = EmailService.send_email(
-                recipient_email=user_email,
-                subject=subject,
-                body_content=f"<div style='font-family: sans-serif; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;'>"
-                             f"<h2>New System Notification</h2>"
-                             f"<p>{message}</p>"
-                             f"</div>",
-                sender_email=sender
-            )
-            result = {
-                "channel": "email",
-                "details": email_result,
-                "status": "Email sent successfully"
-            }
-            
-        elif channel == "webhook":
-            logger.info("Sending message via Teams Webhook")
-            webhook_url = data.get("webhook_url")
-            import os
-            if not webhook_url:
-                webhook_url = os.getenv("TEAMS_WEBHOOK_URL")
-            if not webhook_url:
-                return jsonify({
-                    "success": False,
-                    "error": "No Webhook URL provided. Please supply 'webhook_url' in request payload or configure TEAMS_WEBHOOK_URL."
-                }), 400
-                
-            webhook_result = WebhookService.send_webhook_message(webhook_url, message)
-            result = {
-                "channel": "webhook",
-                "details": webhook_result,
-                "status": "Webhook message sent successfully"
-            }
-            recipient_info = {
-                "username": "Teams Channel Webhook",
-                "displayName": "Teams Channel",
-                "email": "N/A",
-                "id": "N/A"
-            }
-        else:
-            return jsonify({"error": f"Unknown notification channel '{channel}'"}), 400
-            
+        recipient_info = {
+            "username": username,
+            "displayName": display_name,
+            "userPrincipalName": user_upn,
+            "id": user_id
+        }
+        logger.info(f"Found user: {display_name} (UPN: {user_upn}, ID: {user_id})")
+        
+        # 2. Send private message via Teams Activity API
+        logger.info(f"Sending Teams notification to: {user_upn}")
+        activity_result = TeamsActivityService.send_activity_notification(
+            user_id=user_id,
+            message_text=message
+        )
+        
         return jsonify({
             "success": True,
             "recipient": recipient_info,
-            "delivery": result
+            "message": message,
+            "status": "Notification sent successfully via Teams Activity API"
         })
         
     except Exception as e:
-        logger.error(f"Failed to send notification via {channel}: {str(e)}", exc_info=True)
+        logger.error(f"Failed to send message: {str(e)}", exc_info=True)
         return jsonify({
             "success": False,
             "error": str(e),
-            "troubleshooting": (
-                "Please double-check Azure AD App Registration permissions in the Azure Portal. "
-                "Ensure required permissions (e.g., User.Read.All, TeamsActivity.Send, Mail.Send) "
-                "are consented by an Admin."
-            )
+            "troubleshooting": "Ensure the bot is installed in Teams and has proper Azure AD permissions."
         }), 500
 
 # --- Dynamic Teams Manifest Generator ---
