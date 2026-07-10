@@ -209,7 +209,7 @@ def build_html(p):
     li_html = "".join([f"<li>{line}</li>" for line in detail_lines])
     
     html = f"""
-    <div style="font-family: sans-serif; font-size: 12px; line-height: 1.2;">
+    <div style="font-family: sans-serif; font-size: 12px; line-height: 1.2; max-width: 350px;">
         <h3 style="margin: 0 0 2px 0; color: {color_hex}; font-size: 14px;">{meta['icon']} {p.get('name', 'Notification')}</h3>
         <p style="margin: 0 0 4px 0;"><strong>{meta['label']}</strong></p>
         <hr style="margin: 2px 0; border: 0; border-top: 1px solid #eee;">
