@@ -183,6 +183,50 @@ def build_card(p):
         }]
     }
 
+# ===== Build HTML (For User Chat) =====
+def build_html(p):
+    type_key = p.get("type", "").upper()
+    meta = LEVEL_MAP.get(type_key, {"icon": "ℹ️", "label": type_key, "color": "default"})
+    
+    # Map adaptive card colors to HEX for HTML
+    color_hex = {
+        "warning": "#FFB900",    # Yellow
+        "attention": "#E81123",  # Red
+        "good": "#107C10",       # Green
+        "accent": "#0078D4",     # Blue
+        "default": "#000000"     # Black
+    }.get(meta["color"], "#000000")
+
+    # Normalize detail
+    detail_raw = p.get("detail", [])
+    if isinstance(detail_raw, str):
+        detail_lines = [detail_raw]
+    elif isinstance(detail_raw, list):
+        detail_lines = [str(x) for x in detail_raw if x]
+    else:
+        detail_lines = [str(detail_raw)]
+        
+    li_html = "".join([f"<li>{line}</li>" for line in detail_lines])
+    
+    html = f"""
+    <div style="font-family: sans-serif; font-size: 12px; line-height: 1.2;">
+        <h3 style="margin: 0 0 2px 0; color: {color_hex}; font-size: 14px;">{meta['icon']} {p.get('name', 'Notification')}</h3>
+        <p style="margin: 0 0 4px 0;"><strong>{meta['label']}</strong></p>
+        <hr style="margin: 2px 0; border: 0; border-top: 1px solid #eee;">
+        
+        <p style="margin: 4px 0;"><strong>⏰ Thời gian:</strong> {p.get('time', 'N/A')} | <strong>🚦 Trạng thái:</strong> {meta['icon']} {meta['label']}</p>
+        <p style="margin: 4px 0;">❌ <strong>Mô tả lỗi:</strong> {p.get('error', 'N/A')}</p>
+        
+        <p style="margin: 4px 0;">📋 <strong>Chi tiết hệ thống:</strong></p>
+        <ul style="font-size: 11px; color: #605E5C; margin: 0 0 4px 0; padding-left: 20px;">{li_html}</ul>
+        
+        <p style="color: #0078D4; margin: 4px 0;">🛠 <strong>Hành động đề xuất:</strong> <b>{p.get('action', 'N/A')}</b></p>
+        <hr style="margin: 2px 0; border: 0; border-top: 1px solid #eee;">
+        <p style="margin: 4px 0;"><a href="{p.get('grafana', '#')}">📊 Xem trên Grafana</a></p>
+    </div>
+    """
+    return html
+
 # ===== Health check =====
 @app.route("/health", methods=["GET"])
 def health():
@@ -210,7 +254,7 @@ def push(target):
     # 2. Nếu không có trong Group -> Tự động tìm gửi Cá nhân
     else:
         try:
-            card_content = card["attachments"][0]["content"]
+            html_content = build_html(payload)
             logger.info(f"Target '{target}' not in webhooks. Looking up as user.")
             
             user = GraphService.find_user(target)
@@ -222,7 +266,7 @@ def push(target):
             
             result = TeamsActivityService.send_activity_notification(
                 user_id=user_id,
-                card_content=card_content
+                message_text=html_content
             )
             return jsonify(result)
         except Exception as e:
