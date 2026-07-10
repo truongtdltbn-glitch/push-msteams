@@ -214,7 +214,8 @@ def build_html(p):
         <p style="margin: 0 0 4px 0;"><strong>{meta['label']}</strong></p>
         <hr style="margin: 2px 0; border: 0; border-top: 1px solid #eee;">
         
-        <p style="margin: 4px 0;"><strong>⏰ Thời gian:</strong> {p.get('time', 'N/A')} | <strong>🚦 Trạng thái:</strong> {meta['icon']} {meta['label']}</p>
+        <p style="margin: 4px 0;"><strong>⏰ Thời gian:</strong> {p.get('time', 'N/A')}<br>
+        <strong>🚦 Trạng thái:</strong> {meta['icon']} {meta['label']}</p>
         <p style="margin: 4px 0;">❌ <strong>Mô tả lỗi:</strong> {p.get('error', 'N/A')}</p>
         
         <p style="margin: 4px 0;">📋 <strong>Chi tiết hệ thống:</strong></p>
