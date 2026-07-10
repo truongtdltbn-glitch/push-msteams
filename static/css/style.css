@@ -114,12 +114,41 @@ header {
     justify-content: space-between;
     align-items: center;
     padding: 10px 0;
+    width: 100%;
 }
 
 .logo {
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logout-button {
+    padding: 8px 16px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.logout-button:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+.logout-button:active {
+    transform: scale(0.98);
+}
 }
 
 .logo h1 {

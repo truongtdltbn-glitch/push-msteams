@@ -12,6 +12,13 @@ class Config:
     SERVICE_ACCOUNT_EMAIL = os.getenv("SERVICE_ACCOUNT_EMAIL")
     SERVICE_ACCOUNT_PASSWORD = os.getenv("SERVICE_ACCOUNT_PASSWORD")
     
+    # Admin credentials for web login
+    ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "PGBank@2026devops")
+
+    # API Key for curl / programmatic access (set via environment variable)
+    API_KEY = os.getenv("API_KEY", "")
+    
     TEAMS_BOT_ID = os.getenv("TEAMS_BOT_ID", AZURE_CLIENT_ID)
     DEFAULT_SENDER_EMAIL = os.getenv("DEFAULT_SENDER_EMAIL")
     

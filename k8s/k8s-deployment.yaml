@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: push-chat
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: push-chat-app
+  namespace: push-chat
+  labels:
+    app: push-chat
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: push-chat
+  template:
+    metadata:
+      labels:
+        app: push-chat
+        version: v1
+    spec:
+      containers:
+      - name: push-chat
+        image: push-chat:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: FLASK_DEBUG
+          value: "False"
+        - name: FLASK_PORT
+          value: "5000"
+        envFrom:
+        - secretRef:
+            name: push-chat-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/config
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/config
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: push-chat-service
+  namespace: push-chat
+  labels:
+    app: push-chat
+spec:
+  type: LoadBalancer
+  selector:
+    app: push-chat
+  ports:
+  - name: http
+    port: 80
+    targetPort: 5000
+    protocol: TCP

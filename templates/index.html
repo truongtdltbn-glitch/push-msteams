@@ -26,8 +26,11 @@
                 <h1>Push-Chat</h1>
                 <span class="badge">API Controller</span>
             </div>
-            <div id="config-status-badge" class="status-badge loading">
-                <span class="dot"></span> Checking Configuration...
+            <div class="header-right">
+                <div id="config-status-badge" class="status-badge loading">
+                    <span class="dot"></span> Checking Configuration...
+                </div>
+                <button id="logout-btn" onclick="handleLogout()" class="logout-button">Logout</button>
             </div>
         </header>
 
@@ -222,14 +225,14 @@
             
             const username = document.getElementById("username-input").value.trim();
             const message = document.getElementById("message-input").value.trim();
-            
-            const payload = { username, message };
+
+            const payload = { target_user: username, message };
             
             // Set sending UI state
             submitBtn.disabled = true;
             spinner.classList.remove("hidden");
             
-            addLog(`Triggering API POST /api/send (teams_bot)...`, "info");
+            addLog(`Triggering API POST /api/send for: ${username}...`, "info");
             
             try {
                 const res = await fetch("/api/send", {
@@ -257,9 +260,121 @@
             }
         }
 
+        // ===== INACTIVITY LOGOUT (5 MINUTES) =====
+        const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+        const WARNING_TIME = 30 * 1000; // 30 seconds warning before logout
+        let inactivityTimer = null;
+        let warningShown = false;
+
+        function resetInactivityTimer() {
+            // Clear existing timer
+            if (inactivityTimer) {
+                clearTimeout(inactivityTimer);
+            }
+            warningShown = false;
+            
+            // Set new timer
+            inactivityTimer = setTimeout(() => {
+                showInactivityWarning();
+            }, INACTIVITY_TIMEOUT - WARNING_TIME);
+        }
+
+        function showInactivityWarning() {
+            if (warningShown) return;
+            warningShown = true;
+            
+            // Show warning dialog
+            const warning = document.createElement('div');
+            warning.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                z-index: 10000;
+                text-align: center;
+                max-width: 400px;
+            `;
+            warning.id = 'inactivity-warning';
+            warning.innerHTML = `
+                <h2 style="color: #ff6b6b; margin-bottom: 15px;">⏰ Session Expiring</h2>
+                <p style="color: #666; margin-bottom: 20px;">
+                    Your session will expire due to inactivity in <span id="countdown">30</span> seconds.
+                </p>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="handleContinueSession()" style="
+                        flex: 1;
+                        padding: 10px;
+                        background: #667eea;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-weight: 600;
+                    ">Continue Session</button>
+                    <button onclick="handleLogout()" style="
+                        flex: 1;
+                        padding: 10px;
+                        background: #f3f3f3;
+                        color: #333;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-weight: 600;
+                    ">Logout Now</button>
+                </div>
+            `;
+            document.body.appendChild(warning);
+            
+            // Countdown
+            let countdown = 30;
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                const countdownEl = document.getElementById('countdown');
+                if (countdownEl) {
+                    countdownEl.textContent = countdown;
+                }
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    handleLogout();
+                }
+            }, 1000);
+        }
+
+        function handleContinueSession() {
+            const warning = document.getElementById('inactivity-warning');
+            if (warning) warning.remove();
+            resetInactivityTimer();
+            addLog('Session activity detected. Timer reset.', 'info');
+        }
+
+        async function handleLogout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (err) {
+                window.location.href = '/login';
+            }
+        }
+
+        // Track user activity
+        const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+        activityEvents.forEach(event => {
+            document.addEventListener(event, () => {
+                if (!warningShown) {
+                    resetInactivityTimer();
+                }
+            }, true);
+        });
+
         // Initial setup
         window.addEventListener("DOMContentLoaded", () => {
             fetchConfigStatus();
+            resetInactivityTimer(); // Start inactivity timer
         });
     </script>
 </body>

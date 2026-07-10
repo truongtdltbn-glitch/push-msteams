@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Push-Chat — API Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090b10;
+            --surface: rgba(255,255,255,0.03);
+            --border: rgba(255,255,255,0.08);
+            --text: #f3f4f6;
+            --muted: #9ca3af;
+            --hint: #6b7280;
+            --primary: #6366f1;
+            --primary-glow: rgba(99,102,241,0.15);
+            --primary-grad: linear-gradient(135deg,#6366f1,#a855f7);
+            --success: #10b981;
+            --success-bg: rgba(16,185,129,0.1);
+            --error: #ef4444;
+            --error-bg: rgba(239,68,68,0.08);
+            --warn: #f59e0b;
+            --code-bg: #0d1117;
+            --radius: 12px;
+            --font: 'Outfit', sans-serif;
+            --mono: 'JetBrains Mono', monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            min-height: 100vh;
+            padding: 0 0 60px;
+        }
+        /* ── Background decoration ── */
+        .bg-glow {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; pointer-events: none; overflow: hidden;
+        }
+        .bg-glow span {
+            position: absolute; border-radius: 50%;
+            filter: blur(120px); opacity: 0.18;
+        }
+        .bg-glow .g1 { width: 500px; height: 500px; background:#6366f1; top:-120px; left:-80px; }
+        .bg-glow .g2 { width: 400px; height: 400px; background:#a855f7; bottom:0; right:-80px; }
+
+        /* ── Top bar ── */
+        .topbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 40px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(9,11,16,0.8);
+            backdrop-filter: blur(12px);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .topbar-logo { display: flex; align-items: center; gap: 10px; }
+        .topbar-logo .icon { font-size: 22px; }
+        .topbar-logo h1 { font-size: 20px; font-weight: 700; }
+        .topbar-logo .badge {
+            font-size: 11px; font-weight: 600; padding: 2px 10px;
+            border-radius: 20px; background: var(--primary-glow);
+            color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3);
+            letter-spacing: 0.5px; text-transform: uppercase;
+        }
+        .topbar-nav a {
+            color: var(--muted); text-decoration: none; font-size: 14px;
+            margin-left: 24px; transition: color .2s;
+        }
+        .topbar-nav a:hover { color: var(--text); }
+        .topbar-nav a.active { color: #a5b4fc; font-weight: 600; }
+
+        /* ── Page layout ── */
+        .page { max-width: 900px; margin: 0 auto; padding: 40px 20px 0; }
+
+        /* ── Hero ── */
+        .hero { text-align: center; padding: 48px 0 40px; }
+        .hero h2 { font-size: 36px; font-weight: 700; margin-bottom: 12px;
+            background: var(--primary-grad); -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--muted); font-size: 16px; max-width: 560px; margin: 0 auto 24px; line-height: 1.6; }
+        .hero-badges { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+        .pill {
+            font-size: 12px; padding: 4px 14px; border-radius: 20px;
+            border: 1px solid var(--border); color: var(--muted); background: var(--surface);
+        }
+        .pill.green { border-color: rgba(16,185,129,.3); color: #34d399; background: var(--success-bg); }
+        .pill.blue  { border-color: rgba(59,130,246,.3); color: #60a5fa; background: rgba(59,130,246,.08); }
+
+        /* ── API Key setup box ── */
+        .setup-box {
+            background: rgba(99,102,241,0.06);
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: var(--radius);
+            padding: 24px 28px;
+            margin-bottom: 40px;
+        }
+        .setup-box h3 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: #a5b4fc; }
+        .setup-box p  { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+        .setup-box code {
+            font-family: var(--mono); font-size: 13px; color: #fbbf24;
+            background: rgba(251,191,36,0.08); padding: 2px 8px; border-radius: 4px;
+        }
+        .setup-box ul { margin-left: 20px; }
+        .setup-box ul li { font-size: 14px; color: var(--muted); margin-bottom: 6px; line-height: 1.6; }
+
+        /* ── Section headings ── */
+        .section-title {
+            font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+            text-transform: uppercase; color: var(--hint);
+            margin-bottom: 16px; padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* ── Endpoint card ── */
+        .endpoint-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .ep-header {
+            display: flex; align-items: flex-start; gap: 14px;
+            padding: 20px 24px; cursor: pointer; user-select: none;
+        }
+        .ep-header:hover { background: rgba(255,255,255,0.02); }
+        .method-badge {
+            font-family: var(--mono); font-size: 12px; font-weight: 600;
+            padding: 4px 10px; border-radius: 6px; white-space: nowrap;
+            flex-shrink: 0; margin-top: 2px;
+        }
+        .method-badge.GET  { background: rgba(16,185,129,.15); color:#34d399; border:1px solid rgba(16,185,129,.3); }
+        .method-badge.POST { background: rgba(59,130,246,.15); color:#60a5fa; border:1px solid rgba(59,130,246,.3); }
+        .ep-info { flex: 1; min-width: 0; }
+        .ep-path {
+            font-family: var(--mono); font-size: 15px; font-weight: 500;
+            color: var(--text); word-break: break-all;
+        }
+        .ep-desc { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+        .ep-chevron { color: var(--hint); transition: transform .25s; flex-shrink: 0; font-size: 18px; }
+        .ep-header.open .ep-chevron { transform: rotate(180deg); }
+
+        .ep-body { display: none; border-top: 1px solid var(--border); padding: 20px 24px; }
+        .ep-body.show { display: block; }
+
+        /* ── Params table ── */
+        .params-title { font-size: 12px; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+        table.params { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        table.params th {
+            text-align: left; font-size: 12px; font-weight: 600;
+            color: var(--hint); text-transform: uppercase; letter-spacing: .8px;
+            padding: 0 12px 8px 0; border-bottom: 1px solid var(--border);
+        }
+        table.params td {
+            padding: 10px 12px 10px 0; font-size: 13px; color: var(--muted);
+            border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top;
+        }
+        table.params td:first-child { font-family: var(--mono); color: #c084fc; }
+        .required-tag {
+            font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;
+            background: rgba(239,68,68,.1); color: #f87171;
+            border: 1px solid rgba(239,68,68,.2); margin-left: 6px;
+            text-transform: uppercase; letter-spacing: .5px; vertical-align: middle;
+        }
+        .optional-tag {
+            font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;
+            background: rgba(107,114,128,.1); color: var(--hint);
+            border: 1px solid rgba(107,114,128,.2); margin-left: 6px;
+            text-transform: uppercase; letter-spacing: .5px; vertical-align: middle;
+        }
+
+        /* ── Code blocks ── */
+        .code-block-wrap { position: relative; margin-bottom: 20px; }
+        .code-label { font-size: 11px; font-weight: 600; color: var(--hint); letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
+        pre.code-block {
+            background: var(--code-bg);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            padding: 16px 20px;
+            overflow-x: auto;
+            font-family: var(--mono);
+            font-size: 13px;
+            line-height: 1.65;
+            color: #e2e8f0;
+            white-space: pre;
+        }
+        pre.code-block .kw  { color: #c084fc; }
+        pre.code-block .str { color: #86efac; }
+        pre.code-block .num { color: #fbbf24; }
+        pre.code-block .cm  { color: #4b5563; }
+        pre.code-block .url { color: #60a5fa; }
+        .copy-btn {
+            position: absolute; top: 32px; right: 10px;
+            font-size: 11px; font-weight: 600; padding: 4px 12px;
+            background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+            color: var(--muted); border-radius: 6px; cursor: pointer; transition: all .2s;
+        }
+        .copy-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+        .copy-btn.copied { color: #34d399; border-color: rgba(16,185,129,.4); }
+
+        /* ── Response example ── */
+        .response-wrap { margin-top: 4px; }
+        .response-tab-bar { display: flex; gap: 2px; margin-bottom: -1px; }
+        .resp-tab {
+            font-size: 12px; font-weight: 600; padding: 6px 16px;
+            border: 1px solid transparent; border-bottom: none;
+            border-radius: 6px 6px 0 0; cursor: pointer; color: var(--hint);
+            background: transparent; transition: all .2s;
+        }
+        .resp-tab.active { background: var(--code-bg); border-color: rgba(255,255,255,0.06); color: var(--text); }
+        .resp-tab.success.active { color: #34d399; }
+        .resp-tab.error.active   { color: #f87171; }
+        .resp-pane { display: none; }
+        .resp-pane.active { display: block; }
+
+        /* ── Auth note ── */
+        .auth-note {
+            display: flex; align-items: flex-start; gap: 10px;
+            background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.2);
+            border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;
+            font-size: 13px; color: #fcd34d; line-height: 1.5;
+        }
+        .auth-note .icon { flex-shrink: 0; margin-top: 1px; }
+
+        /* ── Test form ── */
+        .try-it-section { margin-top: 20px; }
+        .try-title { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
+        .try-form { display: flex; flex-direction: column; gap: 10px; }
+        .try-row { display: flex; flex-direction: column; gap: 4px; }
+        .try-row label { font-size: 12px; color: var(--hint); font-weight: 500; }
+        .try-row input, .try-row textarea {
+            background: var(--code-bg); border: 1px solid var(--border);
+            color: var(--text); font-family: var(--mono); font-size: 13px;
+            padding: 8px 12px; border-radius: 8px; outline: none;
+            transition: border-color .2s;
+        }
+        .try-row input:focus, .try-row textarea:focus { border-color: rgba(99,102,241,0.5); }
+        .try-row textarea { resize: vertical; min-height: 80px; }
+        .try-btn {
+            align-self: flex-start; padding: 8px 22px; font-size: 13px; font-weight: 600;
+            background: var(--primary-grad); color: #fff; border: none;
+            border-radius: 8px; cursor: pointer; transition: opacity .2s;
+        }
+        .try-btn:hover { opacity: 0.85; }
+        .try-result {
+            display: none; background: var(--code-bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 14px; font-family: var(--mono); font-size: 12px;
+            color: var(--muted); white-space: pre-wrap; word-break: break-all;
+            max-height: 260px; overflow-y: auto;
+        }
+        .try-result.show { display: block; }
+        .try-result.ok  { border-color: rgba(16,185,129,.3); color: #86efac; }
+        .try-result.err { border-color: rgba(239,68,68,.3); color: #fca5a5; }
+
+        /* ── Misc ── */
+        .divider { height: 1px; background: var(--border); margin: 32px 0; }
+        @media (max-width: 640px) {
+            .topbar { padding: 12px 16px; }
+            .page { padding: 24px 12px 0; }
+            .hero h2 { font-size: 26px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-glow"><span class="g1"></span><span class="g2"></span></div>
+
+<!-- Top navigation bar -->
+<nav class="topbar">
+    <div class="topbar-logo">
+        <span class="icon">⚡</span>
+        <h1>Push-Chat</h1>
+        <span class="badge">API Reference</span>
+    </div>
+    <div class="topbar-nav">
+        <a href="/login">Admin UI</a>
+        <a href="/api-docs" class="active">API Docs</a>
+    </div>
+</nav>
+
+<div class="page">
+
+    <!-- Hero -->
+    <div class="hero">
+        <h2>REST API Reference</h2>
+        <p>Send Teams notifications programmatically using <code style="font-family:var(--mono);font-size:13px;color:#fbbf24;background:rgba(251,191,36,0.08);padding:2px 8px;border-radius:4px;">curl</code> or any HTTP client. No browser session required — authenticate with an API key.</p>
+        <div class="hero-badges">
+            <span class="pill green">No login required</span>
+            <span class="pill blue">X-API-Key header</span>
+            <span class="pill">JSON request &amp; response</span>
+        </div>
+    </div>
+
+    <!-- API Key setup -->
+    <div class="setup-box">
+        <h3>🔑 API Key Setup</h3>
+        <p>Set the <code>API_KEY</code> environment variable on the server before using these endpoints:</p>
+        <ul>
+            <li>Linux / macOS: <code>export API_KEY="your-secret-key"</code></li>
+            <li>Windows (PowerShell): <code>$env:API_KEY = "your-secret-key"</code></li>
+            <li>Docker / .env file: <code>API_KEY=your-secret-key</code></li>
+        </ul>
+        <p style="margin-top:10px;">Then pass the key in every request header: <code>X-API-Key: your-secret-key</code></p>
+    </div>
+
+    <!-- ── Endpoints ── -->
+    <p class="section-title">Endpoints</p>
+
+    <!-- ── GET /api/v1/user/:username ── -->
+    <div class="endpoint-card" id="ep-user">
+        <div class="ep-header" onclick="toggleEp('user')">
+            <span class="method-badge GET">GET</span>
+            <div class="ep-info">
+                <div class="ep-path">/api/v1/user/<span style="color:#c084fc">{username}</span></div>
+                <div class="ep-desc">Look up a Microsoft Entra ID (Azure AD) user by email, UPN, or display-name alias.</div>
+            </div>
+            <span class="ep-chevron" id="chevron-user">▾</span>
+        </div>
+        <div class="ep-body" id="body-user">
+
+            <div class="auth-note">
+                <span class="icon">🔐</span>
+                <span>Requires <strong>X-API-Key</strong> header. Returns HTTP 401 if the key is missing or invalid.</span>
+            </div>
+
+            <p class="params-title">Path Parameters</p>
+            <table class="params">
+                <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+                <tr>
+                    <td>username<span class="required-tag">required</span></td>
+                    <td>string</td>
+                    <td>The user's email address, UPN, or display-name alias to search for in Entra ID.</td>
+                </tr>
+            </table>
+
+            <div class="code-block-wrap">
+                <p class="code-label">cURL Example</p>
+                <pre class="code-block" id="curl-user">curl -X GET "<span class="url">{{ base_url }}/api/v1/user/truongtd3</span>" \
+     -H <span class="str">"X-API-Key: your-secret-key"</span></pre>
+                <button class="copy-btn" onclick="copyCode('curl-user', this)">Copy</button>
+            </div>
+
+            <div class="response-wrap">
+                <p class="params-title">Response</p>
+                <div class="response-tab-bar">
+                    <button class="resp-tab success active" onclick="switchTab('user','ok',this)">200 OK</button>
+                    <button class="resp-tab error"   onclick="switchTab('user','err',this)">401 / 404</button>
+                </div>
+                <div class="resp-pane active" id="resp-user-ok">
+<pre class="code-block">{
+  <span class="str">"id"</span>: <span class="str">"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"</span>,
+  <span class="str">"displayName"</span>: <span class="str">"Truong Duc"</span>,
+  <span class="str">"mail"</span>: <span class="str">"truongtd3@company.com"</span>,
+  <span class="str">"userPrincipalName"</span>: <span class="str">"truongtd3@company.com"</span>
+}</pre>
+                </div>
+                <div class="resp-pane" id="resp-user-err">
+<pre class="code-block"><span class="cm">// 401 — Missing or invalid API key</span>
+{ <span class="str">"error"</span>: <span class="str">"Invalid API key."</span> }
+
+<span class="cm">// 404 — User not found</span>
+{ <span class="str">"error"</span>: <span class="str">"User 'truongtd3' not found in Microsoft Directory."</span> }</pre>
+                </div>
+            </div>
+
+            <!-- Try it -->
+            <div class="try-it-section">
+                <p class="try-title">▶ Try it</p>
+                <div class="try-form">
+                    <div class="try-row"><label>API Key</label><input type="password" id="try-user-key" placeholder="your-secret-key"></div>
+                    <div class="try-row"><label>Username / email</label><input type="text" id="try-user-name" placeholder="truongtd3"></div>
+                    <button class="try-btn" onclick="tryUser()">Send Request</button>
+                    <pre class="try-result" id="try-user-result"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── POST /api/v1/send ── -->
+    <div class="endpoint-card" id="ep-send">
+        <div class="ep-header" onclick="toggleEp('send')">
+            <span class="method-badge POST">POST</span>
+            <div class="ep-info">
+                <div class="ep-path">/api/v1/send</div>
+                <div class="ep-desc">Send a private Teams Activity notification to a specific user.</div>
+            </div>
+            <span class="ep-chevron" id="chevron-send">▾</span>
+        </div>
+        <div class="ep-body" id="body-send">
+
+            <div class="auth-note">
+                <span class="icon">🔐</span>
+                <span>Requires <strong>X-API-Key</strong> header. Returns HTTP 401 if the key is missing or invalid.</span>
+            </div>
+
+            <p class="params-title">Request Body (application/json)</p>
+            <table class="params">
+                <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                <tr>
+                    <td>target_user<span class="required-tag">required</span></td>
+                    <td>string</td>
+                    <td>Recipient's email, UPN, or display-name alias in Entra ID.</td>
+                </tr>
+                <tr>
+                    <td>message<span class="required-tag">required</span></td>
+                    <td>string</td>
+                    <td>Plain-text message body to deliver as a Teams Activity notification.</td>
+                </tr>
+            </table>
+
+            <div class="code-block-wrap">
+                <p class="code-label">cURL Example</p>
+                <pre class="code-block" id="curl-send">curl -X POST "<span class="url">{{ base_url }}/api/v1/send</span>" \
+     -H <span class="str">"Content-Type: application/json"</span> \
+     -H <span class="str">"X-API-Key: your-secret-key"</span> \
+     -d <span class="str">'{
+       "target_user": "truongtd3@company.com",
+       "message": "Hello from the API!"
+     }'</span></pre>
+                <button class="copy-btn" onclick="copyCode('curl-send', this)">Copy</button>
+            </div>
+
+            <div class="response-wrap">
+                <p class="params-title">Response</p>
+                <div class="response-tab-bar">
+                    <button class="resp-tab success active" onclick="switchTab('send','ok',this)">200 OK</button>
+                    <button class="resp-tab error"   onclick="switchTab('send','err',this)">4xx Errors</button>
+                </div>
+                <div class="resp-pane active" id="resp-send-ok">
+<pre class="code-block">{
+  <span class="str">"success"</span>: <span class="num">true</span>,
+  <span class="str">"recipient"</span>: {
+    <span class="str">"username"</span>: <span class="str">"truongtd3@company.com"</span>,
+    <span class="str">"displayName"</span>: <span class="str">"Truong Duc"</span>,
+    <span class="str">"userPrincipalName"</span>: <span class="str">"truongtd3@company.com"</span>,
+    <span class="str">"id"</span>: <span class="str">"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"</span>
+  },
+  <span class="str">"message"</span>: <span class="str">"Hello from the API!"</span>,
+  <span class="str">"status"</span>: <span class="str">"Notification sent successfully via Teams Activity API"</span>
+}</pre>
+                </div>
+                <div class="resp-pane" id="resp-send-err">
+<pre class="code-block"><span class="cm">// 400 — Missing fields</span>
+{ <span class="str">"error"</span>: <span class="str">"Missing required field: 'message'"</span> }
+
+<span class="cm">// 401 — Bad API key</span>
+{ <span class="str">"error"</span>: <span class="str">"Invalid API key."</span> }
+
+<span class="cm">// 404 — User not found in Entra ID</span>
+{ <span class="str">"success"</span>: <span class="num">false</span>, <span class="str">"error"</span>: <span class="str">"User '...' was not found in Microsoft Entra ID."</span> }</pre>
+                </div>
+            </div>
+
+            <!-- Try it -->
+            <div class="try-it-section">
+                <p class="try-title">▶ Try it</p>
+                <div class="try-form">
+                    <div class="try-row"><label>API Key</label><input type="password" id="try-send-key" placeholder="your-secret-key"></div>
+                    <div class="try-row"><label>target_user</label><input type="text" id="try-send-user" placeholder="user@company.com"></div>
+                    <div class="try-row"><label>message</label><textarea id="try-send-msg" placeholder="Hello from the API!"></textarea></div>
+                    <button class="try-btn" onclick="trySend()">Send Request</button>
+                    <pre class="try-result" id="try-send-result"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ── Other public endpoints ── -->
+    <p class="section-title">Other Endpoints</p>
+
+    <!-- GET /api/manifest/download -->
+    <div class="endpoint-card">
+        <div class="ep-header" onclick="toggleEp('manifest')">
+            <span class="method-badge GET">GET</span>
+            <div class="ep-info">
+                <div class="ep-path">/api/manifest/download</div>
+                <div class="ep-desc">Download the Teams App Manifest ZIP file. No authentication required.</div>
+            </div>
+            <span class="ep-chevron" id="chevron-manifest">▾</span>
+        </div>
+        <div class="ep-body" id="body-manifest">
+            <div class="code-block-wrap">
+                <p class="code-label">cURL Example</p>
+                <pre class="code-block" id="curl-manifest">curl -O "<span class="url">{{ base_url }}/api/manifest/download</span>"</pre>
+                <button class="copy-btn" onclick="copyCode('curl-manifest', this)">Copy</button>
+            </div>
+            <p style="font-size:13px;color:var(--muted);">Returns <code style="font-family:var(--mono);font-size:12px;">teams_manifest.zip</code> — install this in Microsoft Teams to activate the bot.</p>
+        </div>
+    </div>
+
+</div><!-- /.page -->
+
+<script>
+    /* ── Toggle endpoint body ── */
+    function toggleEp(id) {
+        const body    = document.getElementById('body-' + id);
+        const header  = body.previousElementSibling;
+        const chevron = document.getElementById('chevron-' + id);
+        const open = body.classList.toggle('show');
+        header.classList.toggle('open', open);
+    }
+
+    /* ── Response tab switcher ── */
+    function switchTab(ep, which, btn) {
+        const okPane  = document.getElementById('resp-' + ep + '-ok');
+        const errPane = document.getElementById('resp-' + ep + '-err');
+        const tabs    = btn.parentElement.querySelectorAll('.resp-tab');
+        tabs.forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        if (which === 'ok') {
+            okPane.classList.add('active');
+            errPane.classList.remove('active');
+        } else {
+            errPane.classList.add('active');
+            okPane.classList.remove('active');
+        }
+    }
+
+    /* ── Copy button ── */
+    function copyCode(preId, btn) {
+        const text = document.getElementById(preId).innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        });
+    }
+
+    /* ── Show result helper ── */
+    function showResult(el, data, ok) {
+        el.textContent = JSON.stringify(data, null, 2);
+        el.className = 'try-result show ' + (ok ? 'ok' : 'err');
+    }
+
+    /* ── Try it: GET /api/v1/user ── */
+    async function tryUser() {
+        const key  = document.getElementById('try-user-key').value.trim();
+        const name = document.getElementById('try-user-name').value.trim();
+        const el   = document.getElementById('try-user-result');
+        if (!name) { el.textContent = 'Please enter a username.'; el.className = 'try-result show err'; return; }
+        try {
+            const res = await fetch('/api/v1/user/' + encodeURIComponent(name), {
+                headers: { 'X-API-Key': key }
+            });
+            const data = await res.json();
+            showResult(el, data, res.ok);
+        } catch(e) {
+            showResult(el, { error: e.message }, false);
+        }
+    }
+
+    /* ── Try it: POST /api/v1/send ── */
+    async function trySend() {
+        const key  = document.getElementById('try-send-key').value.trim();
+        const user = document.getElementById('try-send-user').value.trim();
+        const msg  = document.getElementById('try-send-msg').value.trim();
+        const el   = document.getElementById('try-send-result');
+        try {
+            const res = await fetch('/api/v1/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
+                body: JSON.stringify({ target_user: user, message: msg })
+            });
+            const data = await res.json();
+            showResult(el, data, res.ok);
+        } catch(e) {
+            showResult(el, { error: e.message }, false);
+        }
+    }
+</script>
+</body>
+</html>
