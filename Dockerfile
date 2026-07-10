@@ -1,21 +1,16 @@
-FROM python:3.13-slim
+FROM harbor.pgbank.com.vn/baseimage/python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
+COPY wheels /wheels
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
-COPY app.py config.py .env .
-COPY services/ services/
-COPY templates/ templates/
-COPY static/ static/
+RUN pip install \
+    --no-index \
+    --find-links=/wheels \
+    -r requirements.txt
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/api/config', timeout=5)"
+COPY app.py .
 
-# Run Flask app
+EXPOSE 8000
 CMD ["python", "app.py"]
-EXPOSE 5000

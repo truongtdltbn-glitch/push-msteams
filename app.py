@@ -1,385 +1,234 @@
+from flask import Flask, request, jsonify
+import requests
 import logging
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
-from functools import wraps
-from config import Config
 from services.graph_service import GraphService
 from services.teams_activity_service import TeamsActivityService
-import os
 
-
-# Configure Logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Configure session
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP in development
-app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JS access to session cookie
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
-app.config['PERMANENT_SESSION_LIFETIME'] = 5 * 60  # 5 minutes (300 seconds)
+# ===== Webhook mapping =====
+WEBHOOKS = {
+    "t24-chat": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e799a13acca74916b316035bd6081fa5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=w8ao_4_u_rJpBkItqGYsmUnSazrwD14fRC4SyRKxH44",
+    "eod": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/852181e9134549ba912a03acd561f564/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=4nmyujfyyiaYAgmFIZNcGZQ2IB8_xa-zUaR9oOW5HlE",
+    "t24-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/61f7d33940e0498bad5bce03166942d9/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=CDhhVrK7jeWvlGro3cTEslZcyaHPwX3MHjztQ_SWsEg",
+    "test": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/730f00b50bfe41fdbb8ef9db83526329/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=oFLs3ebEWQrx7Dju_4bSEF4jNuu8Y15cvfLe8LQsZ5A",
+    "ibft-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/ed44689d54fa4657b440785676dca043/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=EpuuhlwVRzevRXpWv8xsMb041lNd3dTxxyEphNORNq0",
+    "card-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8d6cba3b25c64e9d91410179f00d7e10/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=sllGlnF1dlI8-QXjCdNR0SQ2SPiBYk73hN3ocy709Wg",
+    "system-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/d3f82e1553d14464aded6200006df1ed/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Ari9l7Sy2z9oCCq4p_vjoBSqD2Qbb1C3rQH3d_-kohk",
+    "grafana-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/78321822916845bb9017b1abf4aed664/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=tMvvsGjENx2jVUkEMT_IpSSdqRoYYvqroBIapniM_PI",
+    "report-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/f2681ab8c71642c195041d632ee764fc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ISPdPrik0YHUk012TTU8Ya8UHP4Lc72JNS2_CLp8lGY",
+    "activemq-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e84873f06c9f44be9f83ee9b00ce9d74/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=UIt6HpEfSpGGhBxNVTrCZ-g0ej-uxJQ4VVUQAk15RIE",
+    "il4-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/695b3ffb166f445490ce2ae0e5147f2a/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2rU6YL1tTWxFRMM1gOCJTTMhiqCkxV1xlgkqVPfDv8k",
+    "database-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/747dfb95ff0748a28fa4081c1fd2b948/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=z2L_CpEahgm963qn8gEBvbJHUTERGSfr0HfvVOe0yk4",
+    "uat-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/39e82da36dda406eab6fd83c26f6a9c5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=zVM9oZ5MU5PhLAOdVWmVhPxFAXfmP7kF6epbZLrTc6I",
+    "retail-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c2959d9da3d54fdfb3a8307e644fd995/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=3H6Kvu3DiLEtcVh5BGhI-dNZaZQkMvEV8O7fgIibmnk",
+    "corp-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/f97a462cbeb6492eb1a54a7630c5d0e8/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=zw_vtbCRGd3NYPgILPiOu96mDL48Y4899ikv4lQ5D0k",
+    "aix-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8b5b991f1a9f4b20b45347a3a8df195d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=43MjPRU64FrVxmmGaqZ3k8UJjQx6plJzC9VH_bwHsD8",
+    "ott-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/0603c6034f384881be15811889ae6cb8/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=JOsGwSuNJcM8BkEmjgkN5kHgj3rwGgVNJR_MJ6nh6ms",
+    "camera-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/fc22163d4e3a44cdbc642aad1f252efe/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=KES9O4sJ9JQ7UFmYoR5cTldvuosGP3WjoLXgjBUwcN4",
+    "mobile-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/9b2bde6a6d33497fac1739ceee0951d1/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=d4usD1LlHcMI7mKk1ObK_OtWEL_nQVeEdsL7Nl-3Alg",
+    "api-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/045e656da3c24b80bc96b6d931786148/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=NhNmNjibGiRjGUMjTyXSiBSzk7I409bXJo2M7LjnRMY",
+    "retail-chat": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/dde6210556764ad189a2fa41d007543b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Qt0tvPIToITWNRk54uN91dp0j4b18X6Scjk5XIaAY3M",
+    "kondor-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e6ef9b8da9d84afc9e378b48ebce0067/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=M8am_rYMXnH2vg4_VDJR5D7n-bcdlDSaJcAWpdat-Ls",
+    "kubelet-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/cf3e384e35854fee9068eb100fe8230b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=_m-NiI94RaUTucVGzF41tF__bGWwi_4BCDMs2zUWPbE",
+    "vnpay-chat": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/dde6210556764ad189a2fa41d007543b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Qt0tvPIToITWNRk54uN91dp0j4b18X6Scjk5XIaAY3M"
+}
+ 
 
-# Admin credentials from config
-ADMIN_USERNAME = Config.ADMIN_USERNAME
-ADMIN_PASSWORD = Config.ADMIN_PASSWORD
+# ===== Alert / Job level config =====
+# ===== Alert / Job level config =====
+LEVEL_MAP = {
+    "WARNING":   {"icon": "⚠️", "label": "WARNING",   "color": "warning"},
+    "CRITICAL":  {"icon": "🚨", "label": "CRITICAL",  "color": "attention"},
+    "RESOLVED":  {"icon": "✅", "label": "RESOLVED",  "color": "good"},
+    "RUNNING":   {"icon": "🔄", "label": "RUNNING",   "color": "accent"},
+    "COMPLETED": {"icon": "🏁", "label": "COMPLETED", "color": "good"},
+    "FAILED":    {"icon": "❌", "label": "FAILED",    "color": "attention"}
+}
 
-# Authentication decorator — session-based (web UI)
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user' not in session:
-            return redirect(url_for('login_page'))
-        return f(*args, **kwargs)
-    return decorated_function
+# ===== Build Adaptive Card =====
+def build_card(p):
+    type_key = p.get("type", "").upper()
+    meta = LEVEL_MAP.get(type_key, {"icon": "ℹ️", "label": type_key, "color": "default"})
 
-# Authentication decorator — API key-based (curl / programmatic)
-def api_key_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        api_key = request.headers.get("X-API-Key", "").strip()
-        configured_key = Config.API_KEY
-        if not configured_key:
-            return jsonify({"error": "API key authentication is not configured on this server."}), 503
-        if not api_key:
-            return jsonify({"error": "Missing X-API-Key header."}), 401
-        if api_key != configured_key:
-            logger.warning("Invalid API key used in request")
-            return jsonify({"error": "Invalid API key."}), 401
-        return f(*args, **kwargs)
-    return decorated_function
-
-@app.route("/login")
-def login_page():
-    """Serve the Login Page."""
-    if 'user' in session:
-        return redirect(url_for('index'))
-    return render_template("login.html")
-
-@app.route("/api/login", methods=["POST"])
-def login():
-    """API endpoint for user login."""
-    data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-    
-    if not username or not password:
-        return jsonify({
-            "success": False,
-            "error": "Missing username or password"
-        }), 400
-    
-    # Check credentials
-    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-        session['user'] = username
-        session.permanent = True
-        logger.info(f"User {username} logged in successfully")
-        return jsonify({
-            "success": True,
-            "message": f"Welcome, {username}!"
-        }), 200
+    # Normalize detail -> list
+    detail_raw = p.get("detail", [])
+    if isinstance(detail_raw, str):
+        detail_lines = [detail_raw]
+    elif isinstance(detail_raw, list):
+        detail_lines = [str(x) for x in detail_raw if x]
     else:
-        logger.warning(f"Failed login attempt for user {username}")
-        return jsonify({
-            "success": False,
-            "error": "Invalid username or password"
-        }), 401
+        detail_lines = [str(detail_raw)]
 
-@app.route("/api/logout", methods=["POST"])
-def logout():
-    """API endpoint for user logout."""
-    username = session.get('user', 'Unknown')
-    session.clear()
-    logger.info(f"User {username} logged out")
-    return jsonify({
-        "success": True,
-        "message": "Logged out successfully"
-    }), 200
-
-@app.route("/")
-def index():
-    """Serve the Web Dashboard."""
-    if 'user' not in session:
-        return redirect(url_for('login_page'))
-    return render_template("index.html")
-
-@app.route("/api/config", methods=["GET"])
-@login_required
-def get_config_status():
-    """Return configured status (masking credentials for safety)."""
-    try:
-        Config.validate()
-        status = "Configured"
-    except Exception as e:
-        status = f"Error: {str(e)}"
-        
-    return jsonify({
-        "status": status,
-        "tenant_id": Config.AZURE_TENANT_ID,
-        "client_id": Config.AZURE_CLIENT_ID,
-        "bot_id": Config.TEAMS_BOT_ID,
-        "default_sender": Config.DEFAULT_SENDER_EMAIL or "Not Configured"
-    })
-
-@app.route("/api/user/<username>", methods=["GET"])
-@login_required
-def find_user(username):
-    """API endpoint to search for a user in Entra ID (Azure AD)."""
-    try:
-        user = GraphService.find_user(username)
-        if not user:
-            return jsonify({"error": f"User '{username}' not found in Microsoft Directory."}), 404
-        return jsonify(user)
-    except Exception as e:
-        logger.error(f"Error looking up user: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/send", methods=["POST"])
-def send_notification():
-    """Send a Teams notification. Accepts session auth (web UI) or username+password in body (legacy curl)."""
-    data = request.get_json() or {}
-
-    # --- Authentication ---
-    if 'user' in session:
-        # Web UI: already authenticated via session, no credentials needed
-        pass
-    else:
-        # Legacy / curl: validate username + password in request body
-        req_user = data.get("username", "").strip()
-        req_pass = data.get("password", "")
-        if not req_user or not req_pass:
-            return jsonify({"error": "Missing username or password"}), 400
-        if req_user != ADMIN_USERNAME or req_pass != ADMIN_PASSWORD:
-            logger.warning("Failed send attempt with invalid credentials")
-            return jsonify({"success": False, "error": "Invalid username or password"}), 401
-
-    # target_user: field from web form or curl body
-    target_user = data.get("target_user") or data.get("username", "").strip()
-    message = data.get("message")
-
-    if not target_user:
-        return jsonify({"error": "Missing required field: 'target_user'"}), 400
-    if not message:
-        return jsonify({"error": "Missing required field: 'message'"}), 400
-
-    try:
-        logger.info(f"Looking up user: {target_user}")
-        user = GraphService.find_user(target_user)
-        if not user:
-            return jsonify({
-                "success": False,
-                "error": f"User '{target_user}' was not found in Microsoft Entra ID."
-            }), 404
-
-        user_id = user.get("id")
-        user_upn = user.get("userPrincipalName")
-        display_name = user.get("displayName", target_user)
-
-        recipient_info = {
-            "username": target_user,
-            "displayName": display_name,
-            "userPrincipalName": user_upn,
-            "id": user_id
-        }
-        logger.info(f"Found user: {display_name} (UPN: {user_upn}, ID: {user_id})")
-
-        logger.info(f"Sending Teams notification to: {user_upn}")
-        TeamsActivityService.send_activity_notification(
-            user_id=user_id,
-            message_text=message
-        )
-
-        return jsonify({
-            "success": True,
-            "recipient": recipient_info,
-            "message": message,
-            "status": "Notification sent successfully via Teams Activity API"
+    # Build detail facts or text blocks
+    # We'll use a simple list of text blocks for details to maintain flexibility
+    detail_blocks = []
+    for line in detail_lines:
+        detail_blocks.append({
+            "type": "TextBlock",
+            "text": f"- {line}",
+            "wrap": True,
+            "isSubtle": True,
+            "size": "Small",
+            "spacing": "None"
         })
-        
-    except Exception as e:
-        logger.error(f"Failed to send message: {str(e)}", exc_info=True)
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "troubleshooting": "Ensure the bot is installed in Teams and has proper Azure AD permissions."
-        }), 500
 
-# --- Dynamic Teams Manifest Generator ---
-import io
-import zipfile
-import base64
-import json
-from flask import send_file
-
-OUTLINE_PNG_BASE64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH"
-    "5gcIERIZGzOnNAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkQu4hAAAAdklEQVRYw+2W0QqAMAxD72D//8/dBx9E"
-    "EJnOtTk3EDp5a1qbpEDwRyVSSnsiKgB1r5XWuB3E5p5M5oCI3oUeEZGv6EsEEX1d13Vd13Vd13Vd99/Xk5jZ+562Dpx52x4A8LzN6QHA"
-    "83YnANy390vE2T2ZzAEAvtP6K/VvEfkD928v6t8eF/z2Ag161rG611bFAAAAAElFTkSuQmCC"
-)
-
-COLOR_PNG_BASE64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAAduf34AAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH"
-    "5gcIERIZeM5aHAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkQu4hAAABmklEQVR42u3VwQ3CQAwEQccJ6IAeqIEe"
-    "oiE6IAt1QDfkhuMEiJAilpU8PTt692z+K/b+fBQA4KspQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIk"
-    "QAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIk"
-    "QAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIk"
-    "QAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIk"
-    "QAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIkQAIk"
-    "QAIkQAIkQAIkQAJkhR8AAP//AwAn/WpWphz4AAAAAElFTkSuQmCC"
-)
-
-@app.route("/api/manifest/download", methods=["GET"])
-def download_manifest():
-    """Generate and return a Teams App Manifest zip file dynamically."""
-    try:
-        Config.validate()
-        
-        # Create manifest JSON contents
-        manifest = {
-            "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
-            "manifestVersion": "1.16",
-            "version": "1.0.0",
-            "id": Config.AZURE_CLIENT_ID,
-            "packageName": "com.pushchat.notify",
-            "developer": {
-                "name": "PushChat Admin",
-                "websiteUrl": "https://localhost:5000",
-                "privacyUrl": "https://localhost:5000/privacy",
-                "termsOfUseUrl": "https://localhost:5000/terms"
-            },
-            "icons": {
-                "color": "color.png",
-                "outline": "outline.png"
-            },
-            "name": {
-                "short": "Push-Chat",
-                "full": "Push-Chat Notification Bot"
-            },
-            "description": {
-                "short": "Direct private notifications.",
-                "full": "System bot that delivers direct notification alerts and messages to users."
-            },
-            "accentColor": "#6366F1",
-            "bots": [
-                {
-                    "botId": Config.AZURE_CLIENT_ID,
-                    "scopes": ["personal"],
-                    "supportsFiles": False,
-                    "isNotificationOnly": True
-                }
-            ],
-            "permissions": ["identity", "messageTeamMembers"],
-            "validDomains": [],
-            "webApplicationInfo": {
-                "id": Config.AZURE_CLIENT_ID,
-                "resource": f"api://localhost:5000/{Config.AZURE_CLIENT_ID}"
+    return {
+        "type": "message",
+        "attachments": [{
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "content": {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type": "AdaptiveCard",
+                "version": "1.4",
+                "msteams": {"width": "Full"},
+                "body": [
+                    {
+                        "type": "Container",
+                        "style": meta["color"],
+                        "bleed": True,
+                        "items": [
+                            {
+                                "type": "ColumnSet",
+                                "columns": [
+                                    {
+                                        "type": "Column",
+                                        "width": "auto",
+                                        "verticalContentAlignment": "Center",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": meta["icon"],
+                                                "size": "ExtraLarge"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "Column",
+                                        "width": "stretch",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": p.get("name", "Notification"),
+                                                "weight": "Bolder",
+                                                "size": "Large",
+                                                "wrap": True
+                                            },
+                                            {
+                                                "type": "TextBlock",
+                                                "spacing": "None",
+                                                "text": meta["label"],
+                                                "isSubtle": True,
+                                                "weight": "Bolder"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "Container",
+                        "spacing": "Medium",
+                        "items": [
+                            {
+                                "type": "FactSet",
+                                "facts": [
+                                    {"title": "⏰ Thời gian:", "value": p.get("time", "N/A")},
+                                    {"title": "🚦 Trạng thái:", "value": f"{meta['icon']} {meta['label']}"}
+                                ]
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": f"❌ **Mô tả lỗi:**\n{p.get('error', 'N/A')}",
+                                "wrap": True,
+                                "spacing": "Medium"
+                            },
+                            {
+                                "type": "Container",
+                                "spacing": "Medium",
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "📋 **Chi tiết hệ thống:**",
+                                        "weight": "Bolder",
+                                        "wrap": True
+                                    },
+                                    *detail_blocks
+                                ]
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": f"🛠 **Hành động đề xuất:** {p.get('action', 'N/A')}",
+                                "wrap": True,
+                                "weight": "Bolder",
+                                "color": "Accent",
+                                "spacing": "Large"
+                            }
+                        ]
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "Action.OpenUrl",
+                        "title": "📊 Xem trên Grafana",
+                        "url": p.get("grafana", "#"),
+                        "style": "positive"
+                    }
+                ]
             }
-        }
+        }]
+    }
+
+# ===== Health check =====
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"})
+
+# ===== Push endpoint (Group + Cá nhân) =====
+@app.route("/<target>", methods=["POST"])
+def push(target):
+    payload = request.get_json(silent=True)
+    if not payload:
+        return jsonify({"error": "invalid json"}), 400
+
+    try:
+        card = build_card(payload)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    # 1. Nếu là Group Channel
+    if target in WEBHOOKS:
+        r = requests.post(WEBHOOKS[target], json=card, timeout=10)
+        if r.status_code >= 300:
+            return jsonify({"error": "push failed", "detail": r.text}), 500
+        return jsonify({"status": "ok"})
         
-        # Build Zip in memory
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-            zip_file.writestr("manifest.json", json.dumps(manifest, indent=2))
-            zip_file.writestr("outline.png", base64.b64decode(OUTLINE_PNG_BASE64))
-            zip_file.writestr("color.png", base64.b64decode(COLOR_PNG_BASE64))
+    # 2. Nếu không có trong Group -> Tự động tìm gửi Cá nhân
+    else:
+        try:
+            card_content = card["attachments"][0]["content"]
+            logger.info(f"Target '{target}' not in webhooks. Looking up as user.")
             
-        zip_buffer.seek(0)
-        return send_file(
-            zip_buffer,
-            mimetype="application/zip",
-            as_attachment=True,
-            download_name="teams_manifest.zip"
-        )
-    except Exception as e:
-        logger.error(f"Failed to generate manifest: {str(e)}", exc_info=True)
-        return jsonify({"error": f"Failed to generate manifest: {str(e)}"}), 500
+            user = GraphService.find_user(target)
+            if not user:
+                return jsonify({"error": f"Target '{target}' is not a valid channel and not found as a User in Directory."}), 404
+                
+            user_id = user.get("id")
+            logger.info(f"Sending Teams notification to user_id: {user_id}")
+            
+            result = TeamsActivityService.send_activity_notification(
+                user_id=user_id,
+                card_content=card_content
+            )
+            return jsonify(result)
+        except Exception as e:
+            logger.error(f"Error sending to user: {str(e)}", exc_info=True)
+            return jsonify({"error": str(e)}), 400
 
-# ---------------------------------------------------------------------------
-# Public API v1 — API Key authentication (no session / no login required)
-# Use header:  X-API-Key: <your_api_key>
-# ---------------------------------------------------------------------------
-
-@app.route("/api/v1/user/<username>", methods=["GET"])
-@api_key_required
-def api_v1_find_user(username):
-    """Look up a user in Entra ID using API key authentication."""
-    try:
-        user = GraphService.find_user(username)
-        if not user:
-            return jsonify({"error": f"User '{username}' not found in Microsoft Directory."}), 404
-        return jsonify(user)
-    except Exception as e:
-        logger.error(f"[API v1] Error looking up user: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/v1/send", methods=["POST"])
-@api_key_required
-def api_v1_send_notification():
-    """Send a private Teams notification using API key authentication."""
-    data = request.get_json() or {}
-    target_user = data.get("target_user")
-    message = data.get("message")
-
-    if not target_user:
-        return jsonify({"error": "Missing required field: 'target_user'"}), 400
-    if not message:
-        return jsonify({"error": "Missing required field: 'message'"}), 400
-
-    try:
-        user = GraphService.find_user(target_user)
-        if not user:
-            return jsonify({
-                "success": False,
-                "error": f"User '{target_user}' was not found in Microsoft Entra ID."
-            }), 404
-
-        user_id = user.get("id")
-        user_upn = user.get("userPrincipalName")
-        display_name = user.get("displayName", target_user)
-
-        logger.info(f"[API v1] Sending Teams notification to: {user_upn}")
-        TeamsActivityService.send_activity_notification(
-            user_id=user_id,
-            message_text=message
-        )
-
-        return jsonify({
-            "success": True,
-            "recipient": {
-                "username": target_user,
-                "displayName": display_name,
-                "userPrincipalName": user_upn,
-                "id": user_id
-            },
-            "message": message,
-            "status": "Notification sent successfully via Teams Activity API"
-        })
-
-    except Exception as e:
-        logger.error(f"[API v1] Failed to send message: {str(e)}", exc_info=True)
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "troubleshooting": "Ensure the bot is installed in Teams and has proper Azure AD permissions."
-        }), 500
-
-
-# ---------------------------------------------------------------------------
-# API Documentation page — public, no authentication required
-# ---------------------------------------------------------------------------
-
-@app.route("/api-docs")
-def api_docs():
-    """Render the public API documentation page."""
-    base_url = request.host_url.rstrip("/")
-    return render_template("api_docs.html", base_url=base_url)
-
-
+# ===== Run =====
 if __name__ == "__main__":
-    logger.info(f"Starting Notification Service on port {Config.FLASK_PORT}...")
-    app.run(host="0.0.0.0", port=Config.FLASK_PORT, debug=Config.FLASK_DEBUG)
+    app.run(host="0.0.0.0", port=8000)

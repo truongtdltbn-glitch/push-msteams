@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 class TeamsActivityService:
     @classmethod
-    def send_activity_notification(cls, user_id, message_text):
+    def send_activity_notification(cls, user_id, message_text=None, card_content=None):
         """
         Send a message to a Teams user via 1:1 chat using service account credentials.
         This method uses username + password (Resource Owner Password Credentials flow).
@@ -86,12 +86,33 @@ class TeamsActivityService:
         logger.info(f"[DEBUG] Step 2: Sending message to chat {chat_id}")
         
         send_message_url = f"https://graph.microsoft.com/v1.0/chats/{chat_id}/messages"
-        message_payload = {
-            "body": {
-                "content": message_text,
-                "contentType": "html"
+        if card_content:
+            import uuid
+            import json
+            card_id = str(uuid.uuid4())
+            message_payload = {
+                "body": {
+                    "contentType": "html",
+                    "content": f'<attachment id="{card_id}"></attachment>'
+                },
+                "attachments": [
+                    {
+                        "id": card_id,
+                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "contentUrl": None,
+                        "content": json.dumps(card_content),
+                        "name": None,
+                        "thumbnailUrl": None
+                    }
+                ]
             }
-        }
+        else:
+            message_payload = {
+                "body": {
+                    "content": message_text,
+                    "contentType": "html"
+                }
+            }
         
         logger.info(f"[DEBUG] Send message payload: {message_payload}")
         
