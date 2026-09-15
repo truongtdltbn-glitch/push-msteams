@@ -11,6 +11,7 @@ app = Flask(__name__)
 
 # ===== Webhook mapping =====
 WEBHOOKS = {
+    "noc": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e799a13acca74916b316035bd6081fa5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=w8ao_4_u_rJpBkItqGYsmUnSazrwD14fRC4SyRKxH44",
     "t24-chat": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e799a13acca74916b316035bd6081fa5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=w8ao_4_u_rJpBkItqGYsmUnSazrwD14fRC4SyRKxH44",
     "eod": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/852181e9134549ba912a03acd561f564/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=4nmyujfyyiaYAgmFIZNcGZQ2IB8_xa-zUaR9oOW5HlE",
     "t24-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/61f7d33940e0498bad5bce03166942d9/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=CDhhVrK7jeWvlGro3cTEslZcyaHPwX3MHjztQ_SWsEg",
