@@ -40,8 +40,8 @@ WEBHOOKS = {
     "mcc-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/06/workflows/80e45273d7e24161ac2310bf6b4acaac/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=-Emw2jJlp4tlsdtNEXiMHCq2gJ_-6DXD8XrbkrduZV8",
     "linux-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/78321822916845bb9017b1abf4aed664/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=tMvvsGjENx2jVUkEMT_IpSSdqRoYYvqroBIapniM_PI",
     "esign-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/26/workflows/91e7c2b8702246fe8c81be9b68bf491b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=AWGNq51NHm5Gh3gA7YfL1LceRW6Eaparxc7PgZZr3CI",
-    "ocp-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/cf3e384e35854fee9068eb100fe8230b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=_m-NiI94RaUTucVGzF41tF__bGWwi_4BCDMs2zUWPbE"
-
+    "ocp-channel": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/cf3e384e35854fee9068eb100fe8230b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=_m-NiI94RaUTucVGzF41tF__bGWwi_4BCDMs2zUWPbE",
+    "dwh-chat": "https://defaultc756d8b934af408bb1e49f084cbcc0.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/08/workflows/adb772994d6c468d9eccf572641aaf2a/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Qemu2MYBMofBASIoDWs_DzH60p2LeSS5FAjiulujDds"
 }
 
 # ===== Alert / Job level config =====
